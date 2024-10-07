@@ -1,0 +1,66 @@
+version: '3.9'
+name: 'dataloana'
+services:
+
+  database:
+    image: postgres:14.0-alpine
+    environment:
+      POSTGRES_DB: $DB_NAME
+      POSTGRES_USER: $DB_USER
+      POSTGRES_PASSWORD: $DB_PASS
+      PGDATA: '/var/lib/postgresql/data/pgdata'
+    volumes:
+      - ./data/postgres/init:/docker-entrypoint-initdb.d
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - $DB_PORT:5432
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 4G
+    networks:
+      - networks
+
+  cache:
+    image: redis:6
+
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - '${REDIS_PORT}:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - networks
+
+  db_explorer:
+    image: sqlpad/sqlpad:5
+    ports:
+      - '2211:3000'
+    networks:
+      - networks
+    environment:
+      SQLPAD_ADMIN: 'admin@sqlpad.com'
+      SQLPAD_ADMIN_PASSWORD: 'admin'
+      SQLPAD_APP_LOG_LEVEL: debug
+      SQLPAD_WEB_LOG_LEVEL: warn
+      SQLPAD_SEED_DATA_PATH: /etc/sqlpad/seed-data
+      SQLPAD_CONNECTIONS__db__name: LOCAL
+      SQLPAD_CONNECTIONS__db__driver: postgres
+      SQLPAD_CONNECTIONS__db__host: database
+      SQLPAD_CONNECTIONS__db__database: $DB_NAME
+      SQLPAD_CONNECTIONS__db__username: $DB_USER
+      SQLPAD_CONNECTIONS__db__password: $DB_PASS
+      SQLPAD_CONNECTIONS__db__multiStatementTransactionEnabled: 'true'
+      SQLPAD_CONNECTIONS__db__idleTimeoutSeconds: 86400
+    volumes:
+      - ./data/sqlpad/seed-data:/etc/sqlpad/seed-data
+
+networks:
+  networks:
+    driver: bridge
